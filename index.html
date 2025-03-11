@@ -19,6 +19,7 @@
       #mensaje {
         font-family: sans-serif;
         padding: 20px;
+        color: #444;
       }
     </style>
   </head>
@@ -31,35 +32,56 @@
       const iframe = document.getElementById("iframe");
       const mensaje = document.getElementById("mensaje");
 
-      // Escuchamos el contexto del ítem
+      // Mostrar paso a paso lo que está pasando
+      function logAndShow(msg, data = null) {
+        console.log(msg, data);
+        mensaje.innerText = msg;
+      }
+
       monday.listen("context", async (res) => {
         const itemId = res.data?.itemId;
         const boardId = res.data?.boardId;
 
         if (!itemId || !boardId) {
-          mensaje.innerText = "No se pudo obtener el itemId o boardId.";
+          logAndShow("❌ No se pudo obtener el itemId o boardId.", res.data);
           return;
         }
 
-        // Pedimos los valores de columna
-        const response = await monday.api(`
-          query {
-            items(ids: ${itemId}) {
-              column_values(ids: ["text_mknys7ye"]) {
-                text
+        logAndShow(`📦 Obteniendo URL del ítem ${itemId} del board ${boardId}...`);
+
+        try {
+          const response = await monday.api(`
+            query {
+              items(ids: ${itemId}) {
+                column_values(ids: ["text_mknys7ye"]) {
+                  id
+                  text
+                }
               }
             }
+          `);
+
+          console.log("🧾 Respuesta de monday.api:", response);
+
+          const columnValues = response.data?.items?.[0]?.column_values;
+          if (!columnValues || columnValues.length === 0) {
+            logAndShow("⚠️ No se encontró la columna con ID 'text_mknys7ye'.");
+            return;
           }
-        `);
 
-        const url = response.data.items[0].column_values[0]?.text;
+          const url = columnValues[0]?.text;
 
-        if (url) {
-          iframe.src = url;
-          iframe.style.display = "block";
-          mensaje.style.display = "none";
-        } else {
-          mensaje.innerText = "No se encontró una URL en la columna del elemento.";
+          if (url) {
+            logAndShow(`✅ Mostrando iframe para: ${url}`);
+            iframe.src = url;
+            iframe.style.display = "block";
+            mensaje.style.display = "none";
+          } else {
+            logAndShow("⚠️ La columna está vacía o no tiene una URL.");
+          }
+        } catch (error) {
+          console.error("❌ Error al consultar monday.api:", error);
+          logAndShow("❌ Hubo un error al obtener los datos del ítem.");
         }
       });
     </script>
