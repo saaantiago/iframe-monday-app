@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Iframe por elemento</title>
+    <script src="https://cdn.jsdelivr.net/npm/monday-sdk-js/dist/monday-sdk.min.js"></script>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+      #mensaje {
+        font-family: sans-serif;
+        padding: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="mensaje">Cargando...</div>
+    <iframe id="iframe" style="display: none;"></iframe>
+
+    <script>
+      const monday = window.mondaySdk();
+      const iframe = document.getElementById("iframe");
+      const mensaje = document.getElementById("mensaje");
+
+      // Escuchamos el contexto del ítem
+      monday.listen("context", async (res) => {
+        const itemId = res.data?.itemId;
+        const boardId = res.data?.boardId;
+
+        if (!itemId || !boardId) {
+          mensaje.innerText = "No se pudo obtener el itemId o boardId.";
+          return;
+        }
+
+        // Pedimos los valores de columna
+        const response = await monday.api(`
+          query {
+            items(ids: ${itemId}) {
+              column_values(ids: ["text_mknys7ye"]) {
+                text
+              }
+            }
+          }
+        `);
+
+        const url = response.data.items[0].column_values[0]?.text;
+
+        if (url) {
+          iframe.src = url;
+          iframe.style.display = "block";
+          mensaje.style.display = "none";
+        } else {
+          mensaje.innerText = "No se encontró una URL en la columna del elemento.";
+        }
+      });
+    </script>
+  </body>
+</html>
