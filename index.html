@@ -6,10 +6,9 @@
   <script src="https://cdn.jsdelivr.net/npm/monday-sdk-js/dist/monday.min.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: sans-serif;
       padding: 20px;
     }
-
     iframe {
       width: 100%;
       height: 500px;
@@ -20,44 +19,51 @@
 </head>
 <body>
   <h2>Visualizador de enlace</h2>
-  <div id="message">Cargando enlace...</div>
-  <iframe id="iframeView" src=""></iframe>
+  <div id="message">Cargando enlace del elemento...</div>
+  <iframe id="iframeView" style="display: none;"></iframe>
 
   <script>
     const monday = window.mondaySdk();
     const iframe = document.getElementById("iframeView");
     const message = document.getElementById("message");
-    const linkColumnId = "link_mkny9vt2"; // Tu ID de columna de enlace
+    const columnId = "link_mkny9vt2"; // Tu columna de enlace
 
-    monday.listen("context", async res => {
-      const boardId = res.data.boardId;
-      const itemId = res.data.itemId;
+    monday.listen("context", async (res) => {
+      const itemId = res.data?.itemId;
 
-      if (!boardId || !itemId) {
-        message.innerText = "No se pudo obtener el contexto del elemento.";
+      if (!itemId) {
+        message.innerText = "No se encontró el ID del elemento.";
         return;
       }
 
-      const query = `query {
-        items(ids: ${itemId}) {
-          name
-          column_values(ids: ["${linkColumnId}"]) {
-            id
-            text
+      const query = `
+        query {
+          items(ids: ${itemId}) {
+            name
+            column_values(ids: ["${columnId}"]) {
+              id
+              text
+            }
           }
         }
-      }`;
+      `;
 
-      const result = await monday.api(query);
-      const item = result.data.items[0];
-      const url = item.column_values[0]?.text;
+      try {
+        const response = await monday.api(query);
+        const item = response.data.items[0];
+        const link = item.column_values[0]?.text;
 
-      if (url) {
-        const fixedUrl = url.startsWith("http") ? url : "https://" + url;
-        iframe.src = fixedUrl;
-        message.innerText = `Enlace de "${item.name}":`;
-      } else {
-        message.innerText = "Este elemento no tiene un enlace válido.";
+        if (link) {
+          const formattedLink = link.startsWith("http") ? link : "https://" + link;
+          iframe.src = formattedLink;
+          iframe.style.display = "block";
+          message.innerText = `Mostrando: ${formattedLink}`;
+        } else {
+          message.innerText = "Este elemento no tiene un enlace en la columna.";
+        }
+      } catch (error) {
+        console.error("Error al obtener datos de monday:", error);
+        message.innerText = "Error al cargar el enlace.";
       }
     });
   </script>
