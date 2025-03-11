@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Visualizador de enlace</title>
-  <script src="https://cdn.jsdelivr.net/npm/monday-sdk-js/dist/monday.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mondaycom/apps-sdk@1.14.0/monday-sdk.min.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -23,10 +23,10 @@
   <iframe id="iframeView" style="display: none;"></iframe>
 
   <script>
-    const monday = window.mondaySdk();
+    const monday = new window.MondaySdk();
     const iframe = document.getElementById("iframeView");
     const message = document.getElementById("message");
-    const columnId = "link_mkny9vt2"; // Tu columna de enlace
+    const columnId = "link_mkny9vt2";
 
     monday.listen("context", async (res) => {
       const itemId = res.data?.itemId;
