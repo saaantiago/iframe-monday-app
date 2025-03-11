@@ -1,78 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Visualizador de Enlaces</title>
-  <script src="https://cdn.jsdelivr.net/npm/monday-sdk-js/dist/monday.min.js"></script>
-  <style>
-    body { font-family: sans-serif; padding: 20px; }
-    iframe { width: 100%; height: 500px; border: none; margin-top: 20px; }
-  </style>
-</head>
-<body>
-  <h2>Visualizador de enlace</h2>
-  <select id="itemSelector"></select>
-  <iframe id="iframeView" src=""></iframe>
+<script>
+  const monday = window.mondaySdk();
+  const selector = document.getElementById("itemSelector");
+  const iframe = document.getElementById("iframeView");
 
-  <script>
-    const monday = window.mondaySdk();
-    const selector = document.getElementById("itemSelector");
-    const iframe = document.getElementById("iframeView");
+  // Tu ID de columna fija
+  const linkColumnId = "link_mkny9vt2";
 
-    let linkColumnId = null; // Ajusta según tu columna
+  monday.listen("context", async res => {
+    const boardId = res.data.boardId;
 
-    monday.listen("context", async res => {
-      const boardId = res.data.boardId;
-
-      // Obtener columnas del board
-      const columns = await monday.api(`query {
-        boards(ids: ${boardId}) {
-          columns {
+    // Obtener elementos del board con la columna específica
+    const itemsRes = await monday.api(`query {
+      boards(ids: ${boardId}) {
+        items {
+          id
+          name
+          column_values(ids: ["${linkColumnId}"]) {
             id
-            title
-            type
+            text
           }
         }
-      }`);
+      }
+    }`);
 
-      // Buscar columna de tipo link
-      const linkColumn = columns.data.boards[0].columns.find(col => col.type === "link");
-      if (!linkColumn) return alert("No se encontró una columna de tipo enlace");
-      linkColumnId = linkColumn.id;
+    const items = itemsRes.data.boards[0].items;
 
-      // Obtener elementos del board
-      const itemsRes = await monday.api(`query {
-        boards(ids: ${boardId}) {
-          items {
-            id
-            name
-            column_values(ids: ["${linkColumnId}"]) {
-              id
-              text
-            }
-          }
-        }
-      }`);
-
-      const items = itemsRes.data.boards[0].items;
-      items.forEach(item => {
+    items.forEach(item => {
+      const url = item.column_values[0].text;
+      if (url) {
         const option = document.createElement("option");
-        option.value = item.column_values[0].text;
+        option.value = url;
         option.text = item.name;
         selector.appendChild(option);
-      });
-
-      selector.addEventListener("change", () => {
-        const url = selector.value;
-        iframe.src = url;
-      });
-
-      // Cargar el primero
-      if (items.length > 0) {
-        selector.selectedIndex = 0;
-        iframe.src = items[0].column_values[0].text;
       }
     });
-  </script>
-</body>
-</html>
+
+    selector.addEventListener("change", () => {
+      const url = selector.value;
+      iframe.src = url.startsWith("http") ? url : "https://" + url;
+    });
+
+    // Mostrar el primero automáticamente
+    if (items.length > 0) {
+      const firstUrl = items[0].column_values[0].text;
+      if (firstUrl) {
+        selector.selectedIndex = 0;
+        iframe.src = firstUrl.startsWith("http") ? firstUrl : "https://" + firstUrl;
+      }
+    }
+  });
+</script>
