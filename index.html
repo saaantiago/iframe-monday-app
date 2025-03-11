@@ -1,84 +1,78 @@
 <!DOCTYPE html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Depuración de Iframe Monday</title>
-    <script src="https://cdn.jsdelivr.net/npm/monday-sdk-js/dist/monday-sdk.min.js"></script>
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        overflow: hidden;
-        font-family: sans-serif;
-      }
-      #mensaje {
-        padding: 1em;
-        font-size: 16px;
-        color: #333;
-      }
-      iframe {
-        width: 100%;
-        height: 100%;
-        border: none;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="mensaje">⌛ Esperando contexto de monday...</div>
-    <iframe id="iframe" style="display: none;"></iframe>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualizador de Enlaces</title>
+  <script src="https://cdn.jsdelivr.net/npm/monday-sdk-js/dist/monday.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    iframe { width: 100%; height: 500px; border: none; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>Visualizador de enlace</h2>
+  <select id="itemSelector"></select>
+  <iframe id="iframeView" src=""></iframe>
 
-    <script>
-      const monday = window.mondaySdk();
-      const mensaje = document.getElementById("mensaje");
-      const iframe = document.getElementById("iframe");
+  <script>
+    const monday = window.mondaySdk();
+    const selector = document.getElementById("itemSelector");
+    const iframe = document.getElementById("iframeView");
 
-      function logAndShow(text, data = null) {
-        console.log(text, data);
-        mensaje.innerText = text + (data ? `\n\n${JSON.stringify(data, null, 2)}` : '');
-      }
+    let linkColumnId = null; // Ajusta según tu columna
 
-      // Escuchar contexto desde monday
-      monday.listen("context", async (res) => {
-        logAndShow("📦 Contexto recibido:", res.data);
+    monday.listen("context", async res => {
+      const boardId = res.data.boardId;
 
-        const itemId = res.data?.itemId;
-        const boardId = res.data?.boardId;
-
-        if (!itemId || !boardId) {
-          logAndShow("❌ No se pudo obtener itemId o boardId del contexto.", res.data);
-          return;
-        }
-
-        // Obtener la URL desde la columna
-        try {
-          const response = await monday.api(`
-            query {
-              items(ids: ${itemId}) {
-                column_values(ids: ["text_mknys7ye"]) {
-                  id
-                  text
-                }
-              }
-            }
-          `);
-
-          console.log("🔍 Resultado API:", response);
-
-          const url = response.data?.items?.[0]?.column_values?.[0]?.text;
-
-          if (url) {
-            logAndShow(`✅ URL encontrada: ${url}`);
-            iframe.src = url;
-            iframe.style.display = "block";
-            mensaje.style.display = "none";
-          } else {
-            logAndShow("⚠️ No se encontró una URL en la columna especificada.");
+      // Obtener columnas del board
+      const columns = await monday.api(`query {
+        boards(ids: ${boardId}) {
+          columns {
+            id
+            title
+            type
           }
-        } catch (error) {
-          logAndShow("❌ Error al ejecutar la consulta a monday.api()", error);
         }
+      }`);
+
+      // Buscar columna de tipo link
+      const linkColumn = columns.data.boards[0].columns.find(col => col.type === "link");
+      if (!linkColumn) return alert("No se encontró una columna de tipo enlace");
+      linkColumnId = linkColumn.id;
+
+      // Obtener elementos del board
+      const itemsRes = await monday.api(`query {
+        boards(ids: ${boardId}) {
+          items {
+            id
+            name
+            column_values(ids: ["${linkColumnId}"]) {
+              id
+              text
+            }
+          }
+        }
+      }`);
+
+      const items = itemsRes.data.boards[0].items;
+      items.forEach(item => {
+        const option = document.createElement("option");
+        option.value = item.column_values[0].text;
+        option.text = item.name;
+        selector.appendChild(option);
       });
-    </script>
-  </body>
+
+      selector.addEventListener("change", () => {
+        const url = selector.value;
+        iframe.src = url;
+      });
+
+      // Cargar el primero
+      if (items.length > 0) {
+        selector.selectedIndex = 0;
+        iframe.src = items[0].column_values[0].text;
+      }
+    });
+  </script>
+</body>
 </html>
