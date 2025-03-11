@@ -38,7 +38,7 @@
 
       const query = `
         query {
-          items(ids: ${itemId}) {
+          items(ids: [${itemId}]) {
             name
             column_values(ids: ["${columnId}"]) {
               id
