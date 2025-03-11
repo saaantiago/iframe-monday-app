@@ -1,52 +1,65 @@
-<script>
-  const monday = window.mondaySdk();
-  const selector = document.getElementById("itemSelector");
-  const iframe = document.getElementById("iframeView");
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualizador de enlace</title>
+  <script src="https://cdn.jsdelivr.net/npm/monday-sdk-js/dist/monday.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
 
-  // Tu ID de columna fija
-  const linkColumnId = "link_mkny9vt2";
+    iframe {
+      width: 100%;
+      height: 500px;
+      border: none;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Visualizador de enlace</h2>
+  <div id="message">Cargando enlace...</div>
+  <iframe id="iframeView" src=""></iframe>
 
-  monday.listen("context", async res => {
-    const boardId = res.data.boardId;
+  <script>
+    const monday = window.mondaySdk();
+    const iframe = document.getElementById("iframeView");
+    const message = document.getElementById("message");
+    const linkColumnId = "link_mkny9vt2"; // Tu ID de columna de enlace
 
-    // Obtener elementos del board con la columna específica
-    const itemsRes = await monday.api(`query {
-      boards(ids: ${boardId}) {
-        items {
-          id
+    monday.listen("context", async res => {
+      const boardId = res.data.boardId;
+      const itemId = res.data.itemId;
+
+      if (!boardId || !itemId) {
+        message.innerText = "No se pudo obtener el contexto del elemento.";
+        return;
+      }
+
+      const query = `query {
+        items(ids: ${itemId}) {
           name
           column_values(ids: ["${linkColumnId}"]) {
             id
             text
           }
         }
-      }
-    }`);
+      }`;
 
-    const items = itemsRes.data.boards[0].items;
+      const result = await monday.api(query);
+      const item = result.data.items[0];
+      const url = item.column_values[0]?.text;
 
-    items.forEach(item => {
-      const url = item.column_values[0].text;
       if (url) {
-        const option = document.createElement("option");
-        option.value = url;
-        option.text = item.name;
-        selector.appendChild(option);
+        const fixedUrl = url.startsWith("http") ? url : "https://" + url;
+        iframe.src = fixedUrl;
+        message.innerText = `Enlace de "${item.name}":`;
+      } else {
+        message.innerText = "Este elemento no tiene un enlace válido.";
       }
     });
-
-    selector.addEventListener("change", () => {
-      const url = selector.value;
-      iframe.src = url.startsWith("http") ? url : "https://" + url;
-    });
-
-    // Mostrar el primero automáticamente
-    if (items.length > 0) {
-      const firstUrl = items[0].column_values[0].text;
-      if (firstUrl) {
-        selector.selectedIndex = 0;
-        iframe.src = firstUrl.startsWith("http") ? firstUrl : "https://" + firstUrl;
-      }
-    }
-  });
-</script>
+  </script>
+</body>
+</html>
