@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Visualizador de enlace</title>
+  <title>Visualizador de enlace (Column IDs Dinámicos)</title>
   <script src="https://cdn.jsdelivr.net/npm/monday-sdk-js/dist/main.js"></script>
   <style>
     body {
@@ -11,57 +11,95 @@
     }
     iframe {
       width: 100%;
-      height: 500px;
+      height: 100%;
       border: none;
-      margin-top: 20px;
     }
   </style>
 </head>
 <body>
+  <h2>Visualizador de enlace</h2>
+  <div id="message">Cargando enlace del elemento...</div>
   <iframe id="iframeView" style="display: none;"></iframe>
 
   <script>
-    const monday = new window.mondaySdk();
+    const monday = mondaySdk();
     const iframe = document.getElementById("iframeView");
     const message = document.getElementById("message");
-    const columnId = "link_mkny9vt2";
 
     monday.listen("context", async (res) => {
+      const boardId = res.data?.boardId;
       const itemId = res.data?.itemId;
 
-      if (!itemId) {
-        message.innerText = "No se encontró el ID del elemento.";
+      if (!boardId || !itemId) {
+        message.innerText = "No se encontró boardId o itemId en el contexto.";
         return;
       }
 
-      const query = `
-        query {
-          items(ids: [${itemId}]) {
-            name
-            column_values(ids: ["${columnId}"]) {
-              id
-              text
+      try {
+        // STEP 1: Get all column IDs for this board
+        const columnsQuery = `
+          query ($boardIds: [Int!]!) {
+            boards(ids: $boardIds) {
+              columns {
+                id
+                title
+              }
             }
           }
+        `;
+        const boardResponse = await monday.api(columnsQuery, {
+          variables: { boardIds: [boardId] }
+        });
+        const columnsData = boardResponse.data?.boards?.[0]?.columns ?? [];
+        if (!columnsData.length) {
+          message.innerText = "No se encontraron columnas en este tablero.";
+          return;
         }
-      `;
 
-      try {
-        const response = await monday.api(query);
-        const item = response.data.items[0];
-        const link = item.column_values[0]?.text;
+        // Extract just the IDs
+        const dynamicColumnIds = columnsData.map((col) => col.id);
 
-        if (link) {
-          const formattedLink = link.startsWith("http") ? link : "https://" + link;
-          iframe.src = formattedLink;
+        // STEP 2: Use those column IDs to fetch item column data dynamically
+        const itemQuery = `
+          query($itemIds: [Int], $columnIds: [String]) {
+            items(ids: $itemIds) {
+              name
+              column_values(ids: $columnIds) {
+                id
+                text
+                value
+              }
+            }
+          }
+        `;
+        const itemResponse = await monday.api(itemQuery, {
+          variables: {
+            itemIds: [itemId],
+            columnIds: dynamicColumnIds
+          }
+        });
+
+        const itemData = itemResponse?.data?.items?.[0];
+        if (!itemData) {
+          message.innerText = "No se encontró ningún dato para este elemento.";
+          return;
+        }
+
+        // (Optional) Example: if you assume there's a "Link" column somewhere
+        // and you just want to display the *first* non-empty link:
+        const linkColumn = itemData.column_values.find(
+          (col) => col.text && col.text.startsWith("http")
+        );
+        if (linkColumn) {
+          iframe.src = linkColumn.text;
           iframe.style.display = "block";
-          message.innerText = `Mostrando: ${formattedLink}`;
+          message.innerText = `Mostrando enlace: ${linkColumn.text}`;
         } else {
-          message.innerText = "Este elemento no tiene un enlace en la columna.";
+          message.innerText = "Ninguna columna de este elemento parece contener un link.";
         }
       } catch (error) {
         console.error("Error al obtener datos de monday:", error);
-        message.innerText = "Error al cargar el enlace.";
+        message.innerText = "Error al cargar las columnas dinámicas.";
       }
     });
   </script>
